@@ -21,7 +21,7 @@ func NewClient(cfg *config.Config) (*DB, error) {
 	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
 	err := sqldb.Ping()
 	if err != nil {
-		panic(fmt.Errorf("cant connect to database: %w", err))
+		return nil, fmt.Errorf("cant connect to database: %w", err)
 	}
 	// Open a PostgreSQL database
 	db := bun.NewDB(sqldb, pgdialect.New())

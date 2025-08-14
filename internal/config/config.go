@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 
@@ -35,6 +36,10 @@ type DbConfig struct {
 	User string
 	Pass string
 	Name string
+}
+
+func (cfg *DbConfig) PostgresURL() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", cfg.User, cfg.Pass, cfg.Host, cfg.Port, cfg.Name)
 }
 
 type AuthConfig struct {

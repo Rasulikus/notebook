@@ -1,5 +1,3 @@
-BEGIN;
-
 -- Таблица users
 CREATE TABLE users (
     id           BIGSERIAL PRIMARY KEY,
@@ -7,7 +5,8 @@ CREATE TABLE users (
     password_hash TEXT NOT NULL,
     username     TEXT NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ 
+    updated_at   TIMESTAMPTZ, 
+    deleted_at    TIMESTAMPTZ
 );
 
 -- Таблица notes
@@ -35,7 +34,3 @@ CREATE TABLE notes_tags (
     tag_id  BIGINT REFERENCES tags(id),
     PRIMARY KEY (note_id, tag_id)
 );
-
-ALTER TABLE asdf ADD COLUMN asd TEXT;
-
-COMMIT;

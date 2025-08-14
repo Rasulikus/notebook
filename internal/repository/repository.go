@@ -1,4 +1,4 @@
-package service
+package repository
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"github.com/Rasulikus/notebook/internal/model"
 )
 
-type NoteService interface {
-	Create(ctx context.Context, n *model.Note) error
+type NoteRepository interface {
+	Create(ctx context.Context, note *model.Note) error
 	List(ctx context.Context) ([]model.Note, error)
 }
