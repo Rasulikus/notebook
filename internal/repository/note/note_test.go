@@ -2,6 +2,7 @@ package note
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"testing"
 
@@ -10,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/uptrace/bun"
 )
-
-var note *model.Note
 
 func TestMain(m *testing.M) {
 	testdb.RecreateTables()
@@ -37,15 +36,29 @@ func setupTestSuite(t *testing.T) *testSuite {
 
 func ensureUser(t *testing.T, db *bun.DB, ctx context.Context) *model.User {
 	t.Helper()
-	u := &model.User{Email: "test@mail.ru", PasswordHash: "x", UserName: "test"}
-	_, err := db.NewInsert().Model(u).Exec(ctx)
+	u := &model.User{Email: "test@mail.ru", PasswordHash: "x", Name: "test"}
+	err := db.NewInsert().Model(u).Scan(ctx, u)
 	require.NoError(t, err)
+	require.NotZero(t, u.ID)
 	return u
 }
 
-func Test_repo_Create(t *testing.T) {
-	ts := setupTestSuite(t)
+func insertNote(t *testing.T, db *bun.DB, ctx context.Context, userID int64, title, text string) *model.Note {
+	t.Helper()
+	n := &model.Note{
+		Title:  title,
+		Text:   text,
+		UserID: userID,
+	}
+	err := db.NewInsert().Model(n).Scan(ctx, n)
+	require.NoError(t, err)
+	require.NotZero(t, n.ID)
+	return n
+}
 
+func Test_Repo_Create(t *testing.T) {
+	ts := setupTestSuite(t)
+	testdb.CleanDB(ts.ctx)
 	user := ensureUser(t, ts.db, ts.ctx)
 	tests := []struct {
 		name    string
@@ -66,7 +79,7 @@ func Test_repo_Create(t *testing.T) {
 			&model.Note{
 				Title:  "test note",
 				Text:   "my error test note",
-				UserID: 5,
+				UserID: 999999999,
 			},
 			true,
 		},
@@ -83,4 +96,32 @@ func Test_repo_Create(t *testing.T) {
 			require.NotZero(t, tt.note.ID)
 		})
 	}
+}
+
+func Test_Repo_List(t *testing.T) {
+	ts := setupTestSuite(t)
+	testdb.CleanDB(ts.ctx)
+	user := ensureUser(t, ts.db, ts.ctx)
+	insertNote(t, ts.db, ts.ctx, user.ID, "n1", "note 1")
+	insertNote(t, ts.db, ts.ctx, user.ID, "n2", "note 2")
+	insertNote(t, ts.db, ts.ctx, user.ID, "n3", "note 3")
+
+	list, err := ts.noteRepo.List(ts.ctx)
+	require.NoError(t, err)
+	require.Equal(t, len(list), 3)
+}
+
+func Test_Repo_GetByID(t *testing.T) {
+	ts := setupTestSuite(t)
+	testdb.CleanDB(ts.ctx)
+	user := ensureUser(t, ts.db, ts.ctx)
+	n := insertNote(t, ts.db, ts.ctx, user.ID, "n1", "note 1")
+
+	got, err := ts.noteRepo.GetByID(ts.ctx, n.ID)
+	require.NoError(t, err)
+	require.Equal(t, got.ID, n.ID)
+
+	gotErr, err := ts.noteRepo.GetByID(ts.ctx, 99999999)
+	require.ErrorIs(t, err, sql.ErrNoRows, "there is no note with this id")
+	require.Nil(t, gotErr)
 }

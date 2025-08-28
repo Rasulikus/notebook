@@ -22,20 +22,27 @@ func (h *NoteHandler) RegisterNotes(r *gin.RouterGroup) {
 }
 
 func (h *NoteHandler) create(c *gin.Context) {
-	var req model.Note
-	if err := c.BindJSON(&req); err != nil {
+	var req CreateNoteReq
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	h.s.Create(c, &req)
+	ctx := c.Request.Context()
+
+	n := model.Note{Title: req.Title, Text: req.Text}
+	if err := h.s.Create(ctx, &n); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
 	c.JSON(http.StatusCreated, req)
 }
 
 func (h *NoteHandler) list(c *gin.Context) {
-	notes, err := h.s.List(c)
+	ctx := c.Request.Context()
+	notes, err := h.s.List(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, notes)
+	resp := toNotesResp(notes)
+	c.JSON(http.StatusOK, resp)
 }

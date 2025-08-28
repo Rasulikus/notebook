@@ -7,6 +7,12 @@ import (
 )
 
 type NoteService interface {
-	Create(ctx context.Context, n *model.Note) error
+	Create(ctx context.Context, note *model.Note) error
 	List(ctx context.Context) ([]model.Note, error)
+	GetByID(ctx context.Context, id int64) (*model.Note, error)
+}
+
+type AuthService interface {
+	Register()
+	Login()
 }

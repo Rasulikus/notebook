@@ -2,9 +2,14 @@ package note
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Rasulikus/notebook/internal/model"
 	"github.com/uptrace/bun"
+)
+
+var (
+	ErrRowsAffected = errors.New("affected rows more than need necessary")
 )
 
 type repo struct {
@@ -16,8 +21,8 @@ func NewRepository(db *bun.DB) *repo {
 	return &repo{db: db}
 }
 
-func (r *repo) Create(ctx context.Context, n *model.Note) error {
-	err := r.db.NewInsert().Model(n).Scan(ctx, n)
+func (r *repo) Create(ctx context.Context, note *model.Note) error {
+	err := r.db.NewInsert().Model(note).Scan(ctx, note)
 	return err
 }
 
@@ -25,4 +30,13 @@ func (r *repo) List(ctx context.Context) ([]model.Note, error) {
 	var notes []model.Note
 	err := r.db.NewSelect().Model(&notes).Scan(ctx)
 	return notes, err
+}
+
+func (r *repo) GetByID(ctx context.Context, id int64) (*model.Note, error) {
+	note := new(model.Note)
+	err := r.db.NewSelect().Model(note).Where("id = ?", id).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return note, nil
 }

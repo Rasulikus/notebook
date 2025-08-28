@@ -1,6 +1,7 @@
 package testdb
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -18,9 +19,17 @@ import (
 )
 
 var (
-	fs      embed.FS
-	testDB  *bun.DB
-	testDSN string
+	fs          embed.FS
+	testDB      *bun.DB
+	testDSN     string
+	truncateSQL = `
+	TRUNCATE TABLE
+		notes_tags,
+		notes,
+		tags,
+		users
+	RESTART IDENTITY CASCADE;
+	`
 )
 
 func DB() *bun.DB {
@@ -90,5 +99,12 @@ func RecreateTables() {
 
 	if err := m.Up(); err != nil {
 		log.Fatalf("migrate.Up: %v", err)
+	}
+}
+
+func CleanDB(ctx context.Context) {
+	_, err := testDB.ExecContext(ctx, truncateSQL)
+	if err != nil {
+		log.Fatalf("error clean db: %v", err)
 	}
 }

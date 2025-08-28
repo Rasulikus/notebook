@@ -3,7 +3,7 @@ CREATE TABLE users (
     id           BIGSERIAL PRIMARY KEY,
     email        TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    username     TEXT NOT NULL,
+    name         TEXT NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ, 
     deleted_at    TIMESTAMPTZ
@@ -13,7 +13,7 @@ CREATE TABLE users (
 CREATE TABLE notes (
     id        BIGSERIAL PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL,
     user_id   BIGINT REFERENCES users(id),
     title     TEXT NOT NULL,
     text      TEXT
@@ -34,3 +34,12 @@ CREATE TABLE notes_tags (
     tag_id  BIGINT REFERENCES tags(id),
     PRIMARY KEY (note_id, tag_id)
 );
+
+-- Таблица sessions
+CREATE TABLE sessions (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    refresh_token_hash BYTEA UNIQUE NOT NULL,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)
