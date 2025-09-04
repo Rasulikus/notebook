@@ -16,13 +16,14 @@ func NewRepository(db *bun.DB) *repo {
 }
 
 func (r *repo) Create(ctx context.Context, user *model.User) error {
-	err := r.db.NewInsert().Model(user).Scan(ctx, user)
+	_, err := r.db.NewInsert().Model(user).Exec(ctx)
 	return err
+
 }
 
-func (r *repo) FindByEmail(ctx context.Context, email string) (*model.User, error) {
+func (r *repo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	user := new(model.User)
-	err := r.db.NewSelect().Model(user).Scan(ctx)
+	err := r.db.NewSelect().Model(user).Where("email = ?", email).Scan(ctx)
 	if err != nil {
 		return nil, err
 	}

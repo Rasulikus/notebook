@@ -15,12 +15,11 @@ type NoteRepository interface {
 
 type UserRepository interface {
 	Create(ctx context.Context, user *model.User) error
-	FindByEmail(ctx context.Context, email string) (*model.User, error)
+	GetByEmail(ctx context.Context, email string) (*model.User, error)
 }
 
 type SessionRepository interface {
 	Create(ctx context.Context, session *model.Session) error
-	FindByHash(ctx context.Context, hash []byte) (*model.Session, error)
-	Rotate(ctx context.Context, oldHash, newHash []byte, newExp time.Time) error
+	RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte, newExpiresAt time.Time) (*model.Session, error)
 	DeleteByUserID(ctx context.Context, userID int64) error
 }

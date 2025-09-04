@@ -88,7 +88,7 @@ func Test_Repo_Create(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ts.noteRepo.Create(ts.ctx, tt.note)
 			if tt.wantErr {
-				require.Error(t, err, "there is no user with this id")
+				require.Error(t, err, tt.name)
 				return
 			}
 

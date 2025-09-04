@@ -13,6 +13,6 @@ type NoteService interface {
 }
 
 type AuthService interface {
-	Register()
-	Login()
+	Register(ctx context.Context, email, password, name string) error
+	Login(ctx context.Context, email, password string) error
 }

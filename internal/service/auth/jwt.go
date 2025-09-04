@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Rasulikus/notebook/internal/errs"
 	"github.com/Rasulikus/notebook/internal/model"
 	"github.com/Rasulikus/notebook/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
@@ -91,39 +90,32 @@ func (m *TokenManager) CreateRefreshToken(ctx context.Context, userID int64) (st
 		}
 		return token, nil
 	}
-	return "", errs.ErrGenerateRefreshToken
+	return "", model.ErrInvalidToken
 }
 
-func (m *TokenManager) RotateRefreshToken(ctx context.Context, oldRefresh string) (string, string, error) {
+func (m *TokenManager) UpdateRefreshToken(ctx context.Context, oldRefresh string) (string, string, error) {
 	now := time.Now().UTC()
 	oldhash := sha256.Sum256([]byte(oldRefresh))
 
-	session, err := m.sessionRepo.FindByHash(ctx, oldhash[:])
-	if err != nil {
-		return "", "", errs.ErrInvalidToken
-	}
-	if !session.ExpiresAt.After(now) {
-		return "", "", errs.ErrInvalidToken
-	}
 	for i := 0; i < maxTries; i++ {
-		newRefresh, hash, err := generateRefreshToken()
+		newRefresh, newHash, err := generateRefreshToken()
 		if err != nil {
 			return "", "", err
 		}
-		err = m.sessionRepo.Rotate(ctx, oldhash[:], hash, now.Add(m.refreshTTL))
+		newSession, err := m.sessionRepo.RotateRefreshTokenTx(ctx, oldhash[:], newHash, now.Add(m.refreshTTL))
 		if err != nil {
 			if isUniqueViolation(err) {
 				continue
 			}
 			return "", "", err
 		}
-		access, err := m.NewAccessToken(session.UserID)
+		access, err := m.NewAccessToken(newSession.UserID)
 		if err != nil {
 			return "", "", err
 		}
 		return access, newRefresh, nil
 	}
-	return "", "", errs.ErrGenerateRefreshToken
+	return "", "", model.ErrInvalidToken
 }
 
 func (m *TokenManager) ParseAccessToken(token string) (int64, error) {
@@ -134,16 +126,16 @@ func (m *TokenManager) ParseAccessToken(token string) (int64, error) {
 		&claims,
 		func(t *jwt.Token) (any, error) {
 			if t.Method != jwt.SigningMethodHS256 {
-				return nil, errs.ErrInvalidToken
+				return nil, model.ErrInvalidToken
 			}
 			return m.secret, nil
 		})
 	if err != nil || !t.Valid {
-		return 0, errs.ErrInvalidToken
+		return 0, model.ErrInvalidToken
 	}
 	userID, err := strconv.ParseInt(claims.Subject, 10, 64)
 	if err != nil {
-		return 0, errs.ErrInvalidToken
+		return 0, model.ErrInvalidToken
 	}
 	return userID, nil
 }

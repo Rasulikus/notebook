@@ -13,7 +13,7 @@ CREATE TABLE users (
 CREATE TABLE notes (
     id        BIGSERIAL PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ,
     user_id   BIGINT REFERENCES users(id),
     title     TEXT NOT NULL,
     text      TEXT
@@ -40,6 +40,7 @@ CREATE TABLE sessions (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     refresh_token_hash BYTEA UNIQUE NOT NULL,
-    expires_at  TIMESTAMPTZ NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ
 )

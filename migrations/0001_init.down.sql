@@ -1,2 +1,6 @@
 -- Удаление всех таблиц
-DROP TABLE notes_tags, tags, notes, users, sessions;
+DROP TABLE IF EXISTS notes_tags CASCADE;
+DROP TABLE IF EXISTS notes CASCADE;
+DROP TABLE IF EXISTS tags CASCADE;
+DROP TABLE IF EXISTS sessions CASCADE;
+DROP TABLE IF EXISTS users CASCADE;

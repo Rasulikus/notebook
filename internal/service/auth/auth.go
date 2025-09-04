@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Rasulikus/notebook/internal/errs"
 	"github.com/Rasulikus/notebook/internal/model"
 	"github.com/Rasulikus/notebook/internal/repository"
 	"golang.org/x/crypto/bcrypt"
@@ -20,12 +19,12 @@ func NewService(userRepo repository.UserRepository) *service {
 
 func (s *service) Register(ctx context.Context, email, password, name string) error {
 	lowEmail := strings.ToLower(strings.TrimSpace(email))
-	existedUser, err := s.userRepo.FindByEmail(ctx, lowEmail)
+	existedUser, err := s.userRepo.GetByEmail(ctx, lowEmail)
 	if err != nil {
 		return err
 	}
 	if existedUser != nil {
-		return errs.ErrUserAlreadyExists
+		return model.ErrUserAlreadyExists
 	}
 
 	cost := bcrypt.DefaultCost
@@ -48,16 +47,16 @@ func (s *service) Register(ctx context.Context, email, password, name string) er
 
 func (s *service) Login(ctx context.Context, email, password string) error {
 	lowEmail := strings.ToLower(strings.TrimSpace(email))
-	existedUser, err := s.userRepo.FindByEmail(ctx, lowEmail)
+	existedUser, err := s.userRepo.GetByEmail(ctx, lowEmail)
 	if err != nil {
 		return err
 	}
 	if existedUser == nil {
-		return errs.ErrWrongCredetials
+		return model.ErrWrongCredetials
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(existedUser.PasswordHash), []byte(password))
 	if err != nil {
-		return errs.ErrWrongCredetials
+		return model.ErrWrongCredetials
 	}
 	return nil
 }

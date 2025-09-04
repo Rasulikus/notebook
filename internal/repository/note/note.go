@@ -22,7 +22,7 @@ func NewRepository(db *bun.DB) *repo {
 }
 
 func (r *repo) Create(ctx context.Context, note *model.Note) error {
-	err := r.db.NewInsert().Model(note).Scan(ctx, note)
+	_, err := r.db.NewInsert().Model(note).Exec(ctx)
 	return err
 }
 

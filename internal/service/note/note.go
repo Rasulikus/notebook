@@ -23,6 +23,6 @@ func (s *service) List(ctx context.Context) ([]model.Note, error) {
 	return s.noteRepo.List(ctx)
 }
 
-func (s *service) GetById(ctx context.Context, id int64) (*model.Note, error) {
+func (s *service) GetByID(ctx context.Context, id int64) (*model.Note, error) {
 	return s.noteRepo.GetByID(ctx, id)
 }

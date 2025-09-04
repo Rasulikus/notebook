@@ -81,7 +81,6 @@ func RecreateTables() {
 	if testDB == nil {
 		DB()
 	}
-
 	d, err := iofs.New(myfs.Files, "migrations")
 	if err != nil {
 		log.Fatalf("iofs.New: %v", err)
@@ -93,6 +92,11 @@ func RecreateTables() {
 	}
 	defer m.Close()
 
+	err = m.Force(1)
+	if err != nil {
+		log.Fatalf("migrate.Force: %v", err)
+		return
+	}
 	if err := m.Down(); err != nil {
 		log.Printf("migrate.Drop: %v", err)
 	}

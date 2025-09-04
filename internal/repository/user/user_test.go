@@ -58,10 +58,10 @@ func Test_Repo_FindByEmail(t *testing.T) {
 	}
 	err := ts.db.NewInsert().Model(user).Scan(ts.ctx, user)
 	require.NoError(t, err)
-	got, err := ts.userRepo.FindByEmail(ts.ctx, user.Email)
+	got, err := ts.userRepo.GetByEmail(ts.ctx, user.Email)
 	require.NoError(t, err)
 	require.Equal(t, got, user)
-	gotErr, err := ts.userRepo.FindByEmail(ts.ctx, "afdfffd@tetet.cl")
+	gotErr, err := ts.userRepo.GetByEmail(ts.ctx, "afdfffd@tetet.cl")
 	require.Error(t, err)
-	require.Equal(t, gotErr, nil)
+	require.Equal(t, gotErr, (*model.User)(nil))
 }
