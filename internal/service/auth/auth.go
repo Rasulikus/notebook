@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 
 	"github.com/Rasulikus/notebook/internal/model"
@@ -10,17 +12,18 @@ import (
 )
 
 type service struct {
-	userRepo repository.UserRepository
+	userRepo   repository.UserRepository
+	jwtService *JWTService
 }
 
-func NewService(userRepo repository.UserRepository) *service {
-	return &service{userRepo: userRepo}
+func NewService(userRepo repository.UserRepository, jwtService *JWTService) *service {
+	return &service{userRepo: userRepo, jwtService: jwtService}
 }
 
 func (s *service) Register(ctx context.Context, email, password, name string) error {
 	lowEmail := strings.ToLower(strings.TrimSpace(email))
 	existedUser, err := s.userRepo.GetByEmail(ctx, lowEmail)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	if existedUser != nil {
@@ -45,18 +48,37 @@ func (s *service) Register(ctx context.Context, email, password, name string) er
 	return nil
 }
 
-func (s *service) Login(ctx context.Context, email, password string) error {
+// должен вернуть access, refresh, userID и ошибку
+func (s *service) Login(ctx context.Context, email, password string) (string, string, int64, error) {
 	lowEmail := strings.ToLower(strings.TrimSpace(email))
-	existedUser, err := s.userRepo.GetByEmail(ctx, lowEmail)
+	user, err := s.userRepo.GetByEmail(ctx, lowEmail)
 	if err != nil {
-		return err
+		return "", "", 0, err
 	}
-	if existedUser == nil {
-		return model.ErrWrongCredetials
+	if user == nil {
+		return "", "", 0, model.ErrWrongCredetials
 	}
-	err = bcrypt.CompareHashAndPassword([]byte(existedUser.PasswordHash), []byte(password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if err != nil {
-		return model.ErrWrongCredetials
+		return "", "", 0, model.ErrWrongCredetials
+	}
+
+	access, err := s.jwtService.CreateAccessToken(user.ID)
+	if err != nil {
+		return "", "", 0, model.ErrWrongCredetials
+	}
+	refresh, err := s.jwtService.CreateRefreshToken(ctx, user.ID)
+	if err != nil {
+		return "", "", 0, model.ErrWrongCredetials
+	}
+	return access, refresh, user.ID, nil
+}
+
+func (m *JWTService) Logout(ctx context.Context, refreshToken string) error {
+	refreshTokenHash := generateRefreshTokenHash(refreshToken)
+	err := m.sessionRepo.SetRevokedAtNow(ctx, refreshTokenHash)
+	if err != nil {
+		return model.ErrInvalidToken
 	}
 	return nil
 }

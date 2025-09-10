@@ -128,3 +128,23 @@ func Test_Repo_RotateRefreshTokenTX(t *testing.T) {
 	require.Equal(t, newSession.ID, session.ID)
 	require.Equal(t, newSession.RefreshTokenHash, newRefreshTokenHash)
 }
+
+func Test_Repo_SetRevokedAtNow(t *testing.T) {
+	ts := setupTestSuite(t)
+	testdb.CleanDB(ts.ctx)
+	now := time.Now().UTC()
+	user := ensureUser(t, ts.db, ts.ctx)
+	session := &model.Session{
+		RefreshTokenHash: []byte("123456"),
+		ExpiresAt:        now.Add(time.Hour),
+		UserID:           user.ID,
+	}
+	err := ts.sessionRepo.Create(ts.ctx, session)
+	require.NoError(t, err)
+
+	err = ts.sessionRepo.SetRevokedAtNow(ts.ctx, session.RefreshTokenHash)
+	require.NoError(t, err)
+
+	err = ts.sessionRepo.SetRevokedAtNow(ts.ctx, session.RefreshTokenHash)
+	require.Error(t, err, "error because revorkedAt already have")
+}

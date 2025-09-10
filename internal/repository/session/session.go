@@ -62,7 +62,22 @@ func (r *repo) RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte
 	return session, nil
 }
 
-func (r *repo) DeleteByUserID(ctx context.Context, userID int64) error {
-	_, err := r.db.NewDelete().Model((*model.Session)(nil)).Where("user_id = ?", userID).Exec(ctx)
-	return err
+func (r *repo) SetRevokedAtNow(ctx context.Context, refreshTokenHash []byte) error {
+	now := time.Now().UTC()
+
+	res, err := r.db.NewUpdate().
+		Model((*model.Session)(nil)).
+		Set("revoked_at = ?", now).
+		Where("refresh_token_hash = ?", refreshTokenHash).
+		Where("revoked_at IS NULL").
+		Where("expires_at > now()").
+		Exec(ctx)
+	if err != nil {
+		return err
+	}
+	aff, _ := res.RowsAffected()
+	if aff != 1 {
+		return model.ErrInvalidToken
+	}
+	return nil
 }

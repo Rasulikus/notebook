@@ -5,7 +5,7 @@ CREATE TABLE users (
     password_hash TEXT NOT NULL,
     name         TEXT NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMPTZ, 
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(), 
     deleted_at    TIMESTAMPTZ
 );
 
@@ -13,7 +13,7 @@ CREATE TABLE users (
 CREATE TABLE notes (
     id        BIGSERIAL PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     user_id   BIGINT REFERENCES users(id),
     title     TEXT NOT NULL,
     text      TEXT

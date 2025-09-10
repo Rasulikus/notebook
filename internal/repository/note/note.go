@@ -26,9 +26,9 @@ func (r *repo) Create(ctx context.Context, note *model.Note) error {
 	return err
 }
 
-func (r *repo) List(ctx context.Context) ([]model.Note, error) {
+func (r *repo) List(ctx context.Context, userID int64) ([]model.Note, error) {
 	var notes []model.Note
-	err := r.db.NewSelect().Model(&notes).Scan(ctx)
+	err := r.db.NewSelect().Model(&notes).Where("user_id = ?", userID).Scan(ctx)
 	return notes, err
 }
 

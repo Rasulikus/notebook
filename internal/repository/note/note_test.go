@@ -106,7 +106,7 @@ func Test_Repo_List(t *testing.T) {
 	insertNote(t, ts.db, ts.ctx, user.ID, "n2", "note 2")
 	insertNote(t, ts.db, ts.ctx, user.ID, "n3", "note 3")
 
-	list, err := ts.noteRepo.List(ts.ctx)
+	list, err := ts.noteRepo.List(ts.ctx, user.ID)
 	require.NoError(t, err)
 	require.Equal(t, len(list), 3)
 }

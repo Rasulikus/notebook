@@ -9,8 +9,8 @@ import (
 type Note struct {
 	bun.BaseModel `bun:"table:notes"`
 	ID            int64     `json:"id" bun:"id,pk,autoincrement"`
-	CreatedAt     time.Time `json:"created_at" bun:"created_at,notnull,nullzero,default:current_timestamp"`
-	UpdatedAt     time.Time `json:"updated_at" bun:"updated_at,nullzero,notnull,default:current_timestamp"`
+	CreatedAt     time.Time `json:"created_at" bun:"created_at,notnull,default:current_timestamp"`
+	UpdatedAt     time.Time `json:"updated_at" bun:"updated_at,notnull,default:current_timestamp"`
 	Title         string    `json:"title" bun:"title,notnull"`
 	Text          string    `json:"text" bun:"text,"`
 

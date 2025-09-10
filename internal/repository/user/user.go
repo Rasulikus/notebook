@@ -28,4 +28,5 @@ func (r *repo) GetByEmail(ctx context.Context, email string) (*model.User, error
 		return nil, err
 	}
 	return user, nil
+
 }

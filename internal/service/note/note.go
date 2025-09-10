@@ -19,8 +19,8 @@ func (s *service) Create(ctx context.Context, n *model.Note) error {
 	return s.noteRepo.Create(ctx, n)
 }
 
-func (s *service) List(ctx context.Context) ([]model.Note, error) {
-	return s.noteRepo.List(ctx)
+func (s *service) List(ctx context.Context, userID int64) ([]model.Note, error) {
+	return s.noteRepo.List(ctx, userID)
 }
 
 func (s *service) GetByID(ctx context.Context, id int64) (*model.Note, error) {

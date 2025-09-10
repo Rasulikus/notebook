@@ -9,7 +9,7 @@ import (
 
 type NoteRepository interface {
 	Create(ctx context.Context, note *model.Note) error
-	List(ctx context.Context) ([]model.Note, error)
+	List(ctx context.Context, userID int64) ([]model.Note, error)
 	GetByID(ctx context.Context, id int64) (*model.Note, error)
 }
 
@@ -21,5 +21,5 @@ type UserRepository interface {
 type SessionRepository interface {
 	Create(ctx context.Context, session *model.Session) error
 	RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte, newExpiresAt time.Time) (*model.Session, error)
-	DeleteByUserID(ctx context.Context, userID int64) error
+	SetRevokedAtNow(ctx context.Context, refreshTokenHash []byte) error
 }

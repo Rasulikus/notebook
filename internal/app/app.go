@@ -1,13 +1,24 @@
 package app
 
 import (
+	"time"
+
 	"github.com/Rasulikus/notebook/internal/api/handler"
+	"github.com/Rasulikus/notebook/internal/api/middleware"
 	"github.com/Rasulikus/notebook/internal/config"
 	"github.com/Rasulikus/notebook/internal/repository"
 	noteRepository "github.com/Rasulikus/notebook/internal/repository/note"
+	"github.com/Rasulikus/notebook/internal/repository/session"
+	"github.com/Rasulikus/notebook/internal/repository/user"
+	"github.com/Rasulikus/notebook/internal/service/auth"
 	"github.com/Rasulikus/notebook/internal/service/note"
 
 	"github.com/gin-gonic/gin"
+)
+
+const (
+	accessTTL  = 15 * time.Minute
+	refreshTTL = 30 * time.Minute
 )
 
 func App() *gin.Engine {
@@ -18,13 +29,30 @@ func App() *gin.Engine {
 		panic(err)
 	}
 
+	userRepo := user.NewRepository(db.DB)
+	sessinoRepo := session.NewRepository(db.DB)
+	jwtService := auth.NewTokenManager([]byte(cfg.Auth.Secret), accessTTL, refreshTTL, sessinoRepo)
+	authService := auth.NewService(userRepo, jwtService)
+	authHandler := handler.NewAuthHanlder(authService, jwtService, refreshTTL, false)
+
 	noteRepo := noteRepository.NewRepository(db.DB)
 	noteService := note.NewService(noteRepo)
 	noteHanlder := handler.NewNoteHanlder(noteService)
 
 	router := gin.Default()
-	noteApi := router.Group("/notes")
-	noteHanlder.RegisterNotes(noteApi)
+	authApi := router.Group("/auth")
+	{
+		authApi.POST("/register", authHandler.Register)
+		authApi.POST("/login", authHandler.Login)
+		authApi.POST("/refresh", authHandler.Refresh)
+		authApi.POST("/logout", authHandler.Logout)
+	}
+
+	noteApi := router.Group("/notes", middleware.AuthMiddleware(jwtService))
+	{
+		noteApi.POST("/", noteHanlder.Create)
+		noteApi.GET("/", noteHanlder.List)
+	}
 
 	return router
 }

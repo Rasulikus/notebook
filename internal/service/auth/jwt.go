@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/Rasulikus/notebook/internal/model"
@@ -15,21 +14,19 @@ import (
 	"github.com/uptrace/bun/driver/pgdriver"
 )
 
-const maxTries = 3
+const (
+	maxTries = 3
+)
 
-type TokenManager struct {
+type JWTService struct {
 	secret      []byte
 	accessTTL   time.Duration
 	refreshTTL  time.Duration
 	sessionRepo repository.SessionRepository
 }
 
-type Claims struct {
-	jwt.RegisteredClaims
-}
-
-func NewTokenManager(secret []byte, accessTTL, refreshTTL time.Duration, sessionRepo repository.SessionRepository) *TokenManager {
-	return &TokenManager{
+func NewTokenManager(secret []byte, accessTTL, refreshTTL time.Duration, sessionRepo repository.SessionRepository) *JWTService {
+	return &JWTService{
 		secret:      secret,
 		accessTTL:   accessTTL,
 		refreshTTL:  refreshTTL,
@@ -37,13 +34,11 @@ func NewTokenManager(secret []byte, accessTTL, refreshTTL time.Duration, session
 	}
 }
 
-func (m *TokenManager) NewAccessToken(userID int64) (string, error) {
+func (m *JWTService) CreateAccessToken(userID int64) (string, error) {
 	now := time.Now().UTC()
-	claims := &Claims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   strconv.FormatInt(userID, 10),
-			ExpiresAt: jwt.NewNumericDate(now.Add(m.accessTTL)),
-		},
+	claims := jwt.MapClaims{
+		"uid": userID,
+		"exp": now.Add(m.accessTTL).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, err := token.SignedString(m.secret)
@@ -53,24 +48,11 @@ func (m *TokenManager) NewAccessToken(userID int64) (string, error) {
 	return signed, nil
 }
 
-func generateRefreshToken() (string, []byte, error) {
-	b := make([]byte, 32)
-
-	if _, err := rand.Read(b); err != nil {
-		return "", nil, err
-	}
-
-	token := base64.RawURLEncoding.EncodeToString(b)
-	sum := sha256.Sum256([]byte(token))
-
-	return token, sum[:], nil
-}
-
-func (m *TokenManager) CreateRefreshToken(ctx context.Context, userID int64) (string, error) {
+func (m *JWTService) CreateRefreshToken(ctx context.Context, userID int64) (string, error) {
 	now := time.Now().UTC()
 
 	for i := 0; i < maxTries; i++ {
-		token, hash, err := generateRefreshToken()
+		token, hash, err := generateRefreshTokenWithHash()
 		if err != nil {
 			return "", err
 		}
@@ -93,12 +75,12 @@ func (m *TokenManager) CreateRefreshToken(ctx context.Context, userID int64) (st
 	return "", model.ErrInvalidToken
 }
 
-func (m *TokenManager) UpdateRefreshToken(ctx context.Context, oldRefresh string) (string, string, error) {
+func (m *JWTService) RotateRefreshToken(ctx context.Context, oldRefresh string) (string, string, error) {
 	now := time.Now().UTC()
-	oldhash := sha256.Sum256([]byte(oldRefresh))
+	oldhash := generateRefreshTokenHash(oldRefresh)
 
 	for i := 0; i < maxTries; i++ {
-		newRefresh, newHash, err := generateRefreshToken()
+		newRefresh, newHash, err := generateRefreshTokenWithHash()
 		if err != nil {
 			return "", "", err
 		}
@@ -109,7 +91,7 @@ func (m *TokenManager) UpdateRefreshToken(ctx context.Context, oldRefresh string
 			}
 			return "", "", err
 		}
-		access, err := m.NewAccessToken(newSession.UserID)
+		access, err := m.CreateAccessToken(newSession.UserID)
 		if err != nil {
 			return "", "", err
 		}
@@ -118,8 +100,8 @@ func (m *TokenManager) UpdateRefreshToken(ctx context.Context, oldRefresh string
 	return "", "", model.ErrInvalidToken
 }
 
-func (m *TokenManager) ParseAccessToken(token string) (int64, error) {
-	var claims Claims
+func (m *JWTService) ParseAccessToken(token string) (int64, error) {
+	var claims jwt.MapClaims
 
 	t, err := jwt.ParseWithClaims(
 		token,
@@ -133,13 +115,30 @@ func (m *TokenManager) ParseAccessToken(token string) (int64, error) {
 	if err != nil || !t.Valid {
 		return 0, model.ErrInvalidToken
 	}
-	userID, err := strconv.ParseInt(claims.Subject, 10, 64)
-	if err != nil {
+	userID, ok := claims["uid"].(float64)
+	if !ok {
 		return 0, model.ErrInvalidToken
 	}
-	return userID, nil
+	return int64(userID), nil
 }
 
+func generateRefreshTokenWithHash() (string, []byte, error) {
+	b := make([]byte, 32)
+
+	if _, err := rand.Read(b); err != nil {
+		return "", nil, err
+	}
+
+	token := base64.RawURLEncoding.EncodeToString(b)
+	sum := sha256.Sum256([]byte(token))
+
+	return token, sum[:], nil
+}
+
+func generateRefreshTokenHash(refreshToken string) []byte {
+	refreshTokenHash := sha256.Sum256([]byte(refreshToken))
+	return refreshTokenHash[:]
+}
 func isUniqueViolation(err error) bool {
 	var pgErr *pgdriver.Error
 	if errors.As(err, &pgErr) && pgErr.Field('C') == "23505" {
