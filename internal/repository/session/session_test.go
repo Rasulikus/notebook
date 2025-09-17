@@ -43,10 +43,6 @@ func ensureUser(t *testing.T, db *bun.DB, ctx context.Context) *model.User {
 	return u
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
-
 func Test_Repo_Create(t *testing.T) {
 	ts := setupTestSuite(t)
 	testdb.CleanDB(ts.ctx)

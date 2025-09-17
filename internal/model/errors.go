@@ -1,10 +1,106 @@
 package model
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"reflect"
+	"strings"
+
+	"github.com/go-playground/validator/v10"
+)
 
 var (
-	ErrInvalidToken         = errors.New("invalid token")
-	ErrGenerateRefreshToken = errors.New("failed to generate refresh token after retries")
-	ErrUserAlreadyExists    = errors.New("user already exists")
-	ErrWrongCredetials      = errors.New("wrong email or password")
+	ErrNotFound     = errors.New("not found")
+	ErrUnauthorized = errors.New("unauthorized")
+	ErrForbidden    = errors.New("forbidden")
+	ErrConflict     = errors.New("conflict")
+	ErrBadRequest   = errors.New("bad request")
 )
+
+var tagMsg = map[string]string{
+	"required": "обязательное поле",
+	"min":      "минимум %s символ(а/ов)",
+	"max":      "максимум %s символ(а/ов)",
+	"len":      "ровно %s символ(а/ов)",
+	"email":    "некорректный email",
+}
+
+type ValidationError struct {
+	Fields map[string]string
+}
+
+func (e *ValidationError) Error() string { return "validation failed" }
+
+type PublicError struct {
+	Code    string      `json:"code"`
+	Message string      `json:"message"`
+	Details interface{} `json:"details,omitempty"`
+}
+
+func ToHTTP(err error) (int, PublicError) {
+	var v *ValidationError
+	if errors.As(err, &v) {
+		return http.StatusUnprocessableEntity, PublicError{
+			Code: "validation_failed", Message: "Проверьте корректность полей", Details: v.Fields,
+		}
+	}
+	switch {
+	case errors.Is(err, ErrUnauthorized):
+		return http.StatusUnauthorized, PublicError{Code: "unauthorized", Message: "Требуется авторизация"}
+	case errors.Is(err, ErrForbidden):
+		return http.StatusForbidden, PublicError{Code: "forbidden", Message: "Доступ запрещён"}
+	case errors.Is(err, ErrNotFound):
+		return http.StatusNotFound, PublicError{Code: "not_found", Message: "Ресурс не найден"}
+	case errors.Is(err, ErrConflict):
+		return http.StatusConflict, PublicError{Code: "conflict", Message: "Конфликт состояния"}
+	case errors.Is(err, ErrBadRequest):
+		return http.StatusBadRequest, PublicError{Code: "bad_request", Message: "Некорректный запрос"}
+	default:
+		return http.StatusInternalServerError, PublicError{
+			Code: "internal_error", Message: "Произошла внутренняя ошибка",
+		}
+	}
+}
+
+func AsValidationError(req any, err error) (*ValidationError, bool) {
+	var verrs validator.ValidationErrors
+	if !errors.As(err, &verrs) {
+		return nil, false
+	}
+	fields := make(map[string]string, len(verrs))
+	for _, fe := range verrs {
+		field := jsonFieldName(req, fe.StructField())
+		tmpl, ok := tagMsg[fe.Tag()]
+		var msg string
+		if ok {
+			if strings.Contains(tmpl, "%s") {
+				msg = fmt.Sprintf(tmpl, fe.Param())
+			} else {
+				msg = tmpl
+			}
+		} else {
+			msg = fe.Error()
+		}
+		fields[field] = msg
+	}
+	return &ValidationError{Fields: fields}, true
+}
+
+func jsonFieldName(obj any, structField string) string {
+	t := reflect.TypeOf(obj)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	if f, ok := t.FieldByName(structField); ok {
+		tag := f.Tag.Get("json")
+		if tag == "" || tag == "-" {
+			return strings.ToLower(structField)
+		}
+		if i := strings.Index(tag, ","); i > 0 {
+			return tag[:i]
+		}
+		return tag
+	}
+	return strings.ToLower(structField)
+}

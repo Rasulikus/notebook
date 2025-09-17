@@ -89,7 +89,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	ctx := c.Request.Context()
 	access, newRefresh, err := h.jwtService.RotateRefreshToken(ctx, refresh)
 	if err != nil {
-		clearRefreshCookie(c, h.secureCookie)
+		//clearRefreshCookie(c, h.secureCookie)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}

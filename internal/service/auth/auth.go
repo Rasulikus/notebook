@@ -27,7 +27,7 @@ func (s *service) Register(ctx context.Context, email, password, name string) er
 		return err
 	}
 	if existedUser != nil {
-		return model.ErrUserAlreadyExists
+		return model.ErrConflict
 	}
 
 	cost := bcrypt.DefaultCost
@@ -56,20 +56,20 @@ func (s *service) Login(ctx context.Context, email, password string) (string, st
 		return "", "", 0, err
 	}
 	if user == nil {
-		return "", "", 0, model.ErrWrongCredetials
+		return "", "", 0, model.ErrBadRequest
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if err != nil {
-		return "", "", 0, model.ErrWrongCredetials
+		return "", "", 0, model.ErrBadRequest
 	}
 
 	access, err := s.jwtService.CreateAccessToken(user.ID)
 	if err != nil {
-		return "", "", 0, model.ErrWrongCredetials
+		return "", "", 0, model.ErrBadRequest
 	}
 	refresh, err := s.jwtService.CreateRefreshToken(ctx, user.ID)
 	if err != nil {
-		return "", "", 0, model.ErrWrongCredetials
+		return "", "", 0, model.ErrBadRequest
 	}
 	return access, refresh, user.ID, nil
 }
@@ -78,7 +78,7 @@ func (m *JWTService) Logout(ctx context.Context, refreshToken string) error {
 	refreshTokenHash := generateRefreshTokenHash(refreshToken)
 	err := m.sessionRepo.SetRevokedAtNow(ctx, refreshTokenHash)
 	if err != nil {
-		return model.ErrInvalidToken
+		return model.ErrBadRequest
 	}
 	return nil
 }

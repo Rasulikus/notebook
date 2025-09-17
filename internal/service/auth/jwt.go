@@ -5,17 +5,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"time"
 
 	"github.com/Rasulikus/notebook/internal/model"
 	"github.com/Rasulikus/notebook/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/uptrace/bun/driver/pgdriver"
-)
-
-const (
-	maxTries = 3
 )
 
 type JWTService struct {
@@ -51,53 +45,41 @@ func (m *JWTService) CreateAccessToken(userID int64) (string, error) {
 func (m *JWTService) CreateRefreshToken(ctx context.Context, userID int64) (string, error) {
 	now := time.Now().UTC()
 
-	for i := 0; i < maxTries; i++ {
-		token, hash, err := generateRefreshTokenWithHash()
-		if err != nil {
-			return "", err
-		}
-
-		sess := &model.Session{
-			UserID:           userID,
-			RefreshTokenHash: hash,
-			ExpiresAt:        now.Add(m.refreshTTL),
-		}
-
-		err = m.sessionRepo.Create(ctx, sess)
-		if err != nil {
-			if isUniqueViolation(err) {
-				continue
-			}
-			return "", err
-		}
-		return token, nil
+	token, hash, err := generateRefreshTokenWithHash()
+	if err != nil {
+		return "", err
 	}
-	return "", model.ErrInvalidToken
+
+	sess := &model.Session{
+		UserID:           userID,
+		RefreshTokenHash: hash,
+		ExpiresAt:        now.Add(m.refreshTTL),
+	}
+
+	err = m.sessionRepo.Create(ctx, sess)
+	if err != nil {
+		return "", err
+	}
+	return token, nil
 }
 
 func (m *JWTService) RotateRefreshToken(ctx context.Context, oldRefresh string) (string, string, error) {
 	now := time.Now().UTC()
 	oldhash := generateRefreshTokenHash(oldRefresh)
 
-	for i := 0; i < maxTries; i++ {
-		newRefresh, newHash, err := generateRefreshTokenWithHash()
-		if err != nil {
-			return "", "", err
-		}
-		newSession, err := m.sessionRepo.RotateRefreshTokenTx(ctx, oldhash[:], newHash, now.Add(m.refreshTTL))
-		if err != nil {
-			if isUniqueViolation(err) {
-				continue
-			}
-			return "", "", err
-		}
-		access, err := m.CreateAccessToken(newSession.UserID)
-		if err != nil {
-			return "", "", err
-		}
-		return access, newRefresh, nil
+	newRefresh, newHash, err := generateRefreshTokenWithHash()
+	if err != nil {
+		return "", "", err
 	}
-	return "", "", model.ErrInvalidToken
+	newSession, err := m.sessionRepo.RotateRefreshTokenTx(ctx, oldhash[:], newHash, now.Add(m.refreshTTL))
+	if err != nil {
+		return "", "", err
+	}
+	access, err := m.CreateAccessToken(newSession.UserID)
+	if err != nil {
+		return "", "", err
+	}
+	return access, newRefresh, nil
 }
 
 func (m *JWTService) ParseAccessToken(token string) (int64, error) {
@@ -108,16 +90,16 @@ func (m *JWTService) ParseAccessToken(token string) (int64, error) {
 		&claims,
 		func(t *jwt.Token) (any, error) {
 			if t.Method != jwt.SigningMethodHS256 {
-				return nil, model.ErrInvalidToken
+				return nil, model.ErrBadRequest
 			}
 			return m.secret, nil
 		})
 	if err != nil || !t.Valid {
-		return 0, model.ErrInvalidToken
+		return 0, model.ErrBadRequest
 	}
 	userID, ok := claims["uid"].(float64)
 	if !ok {
-		return 0, model.ErrInvalidToken
+		return 0, model.ErrBadRequest
 	}
 	return int64(userID), nil
 }
@@ -138,11 +120,4 @@ func generateRefreshTokenWithHash() (string, []byte, error) {
 func generateRefreshTokenHash(refreshToken string) []byte {
 	refreshTokenHash := sha256.Sum256([]byte(refreshToken))
 	return refreshTokenHash[:]
-}
-func isUniqueViolation(err error) bool {
-	var pgErr *pgdriver.Error
-	if errors.As(err, &pgErr) && pgErr.Field('C') == "23505" {
-		return true
-	}
-	return false
 }

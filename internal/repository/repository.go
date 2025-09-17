@@ -9,8 +9,10 @@ import (
 
 type NoteRepository interface {
 	Create(ctx context.Context, note *model.Note) error
-	List(ctx context.Context, userID int64) ([]model.Note, error)
-	GetByID(ctx context.Context, id int64) (*model.Note, error)
+	List(ctx context.Context, userID int64, limit, offset int, order string) ([]model.Note, error)
+	GetByID(ctx context.Context, userID, id int64) (*model.Note, error)
+	UpdateByID(ctx context.Context, userID int64, note *model.Note) error
+	DeleteByID(ctx context.Context, userID, id int64) error
 }
 
 type UserRepository interface {

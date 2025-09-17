@@ -18,7 +18,7 @@ import (
 
 const (
 	accessTTL  = 15 * time.Minute
-	refreshTTL = 30 * time.Minute
+	refreshTTL = 6 * time.Hour
 )
 
 func App() *gin.Engine {
@@ -37,7 +37,7 @@ func App() *gin.Engine {
 
 	noteRepo := noteRepository.NewRepository(db.DB)
 	noteService := note.NewService(noteRepo)
-	noteHanlder := handler.NewNoteHanlder(noteService)
+	noteHanlder := handler.NewNoteHandler(noteService)
 
 	router := gin.Default()
 	authApi := router.Group("/auth")
@@ -50,8 +50,10 @@ func App() *gin.Engine {
 
 	noteApi := router.Group("/notes", middleware.AuthMiddleware(jwtService))
 	{
-		noteApi.POST("/", noteHanlder.Create)
-		noteApi.GET("/", noteHanlder.List)
+		noteApi.POST("", noteHanlder.Create)
+		noteApi.GET("", noteHanlder.List)
+		noteApi.GET("/:id", noteHanlder.GetByID)
+		noteApi.DELETE("/:id", noteHanlder.DeleteByID)
 	}
 
 	return router

@@ -9,6 +9,7 @@ import (
 
 	myfs "github.com/Rasulikus/notebook"
 	"github.com/Rasulikus/notebook/internal/config"
+	"github.com/Rasulikus/notebook/internal/model"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -63,6 +64,8 @@ func newClient(cfg *config.DbConfig) (*bun.DB, error) {
 	db := bun.NewDB(sqldb, pgdialect.New())
 	// Print all queries to stdout
 	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))
+	// add m2m
+	db.RegisterModel((*model.NoteTag)(nil))
 	return db, nil
 }
 

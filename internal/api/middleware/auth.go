@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"net/http"
 	"strings"
 
+	"github.com/Rasulikus/notebook/internal/model"
 	"github.com/Rasulikus/notebook/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -15,13 +15,15 @@ func AuthMiddleware(jwtService service.JWTService) gin.HandlerFunc {
 		authz := c.GetHeader("Authorization")
 		const prefix = "Bearer "
 		if !strings.HasPrefix(authz, prefix) {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing bearer token"})
+			status, pub := model.ToHTTP(model.ErrUnauthorized)
+			c.AbortWithStatusJSON(status, pub)
 			return
 		}
 		tokenStr := strings.TrimPrefix(authz, prefix)
 		uid, err := jwtService.ParseAccessToken(tokenStr)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
+			status, pub := model.ToHTTP(model.ErrUnauthorized)
+			c.AbortWithStatusJSON(status, pub)
 			return
 		}
 		c.Set(ctxUserIDKey, uid)

@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/Rasulikus/notebook/internal/model"
@@ -23,7 +24,7 @@ func (r *repo) Create(ctx context.Context, session *model.Session) error {
 
 func (r *repo) RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte, newExpiresAt time.Time) (*model.Session, error) {
 	session := new(model.Session)
-
+	log.Println(session)
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 
 		err := tx.NewSelect().
@@ -40,6 +41,7 @@ func (r *repo) RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte
 		res, err := tx.NewUpdate().
 			Model(session).
 			Set("refresh_token_hash = ?", newHash).
+			Set("expires_at = ?", newExpiresAt).
 			WherePK().
 			Returning("*").
 			Exec(ctx)
@@ -51,7 +53,7 @@ func (r *repo) RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte
 			return err
 		}
 		if aff != 1 {
-			return model.ErrInvalidToken
+			return model.ErrBadRequest
 		}
 
 		return nil
@@ -59,6 +61,7 @@ func (r *repo) RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte
 	if err != nil {
 		return nil, err
 	}
+	log.Println(session)
 	return session, nil
 }
 
@@ -77,7 +80,7 @@ func (r *repo) SetRevokedAtNow(ctx context.Context, refreshTokenHash []byte) err
 	}
 	aff, _ := res.RowsAffected()
 	if aff != 1 {
-		return model.ErrInvalidToken
+		return model.ErrBadRequest
 	}
 	return nil
 }
