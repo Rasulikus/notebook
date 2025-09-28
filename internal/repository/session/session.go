@@ -61,7 +61,6 @@ func (r *repo) RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte
 	if err != nil {
 		return nil, err
 	}
-	log.Println(session)
 	return session, nil
 }
 
@@ -78,7 +77,10 @@ func (r *repo) SetRevokedAtNow(ctx context.Context, refreshTokenHash []byte) err
 	if err != nil {
 		return err
 	}
-	aff, _ := res.RowsAffected()
+	aff, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
 	if aff != 1 {
 		return model.ErrBadRequest
 	}

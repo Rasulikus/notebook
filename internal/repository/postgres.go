@@ -36,10 +36,12 @@ func NewClient(cfg *config.Config) (*DB, error) {
 	}, nil
 }
 
-func IsUniqueViolation(err error) bool {
-	var pgErr *pgdriver.Error
-	if errors.As(err, &pgErr) && pgErr.Field('C') == "23505" {
-		return true
+func IsNoRowsError(err error) error {
+	if err == nil {
+		return nil
 	}
-	return false
+	if errors.Is(err, sql.ErrNoRows) {
+		return model.ErrNotFound
+	}
+	return err
 }

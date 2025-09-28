@@ -31,11 +31,18 @@ func AuthMiddleware(jwtService service.JWTService) gin.HandlerFunc {
 	}
 }
 
-func CurrentUserID(c *gin.Context) (int64, bool) {
+func CurrentUserID(c *gin.Context) int64 {
 	v, ok := c.Get(ctxUserIDKey)
 	if !ok {
-		return 0, false
+		status, pub := model.ToHTTP(model.ErrUnauthorized)
+		c.AbortWithStatusJSON(status, pub)
+		return 0
 	}
 	id, ok := v.(int64)
-	return id, ok
+	if !ok {
+		status, pub := model.ToHTTP(model.ErrConflict)
+		c.AbortWithStatusJSON(status, pub)
+		return 0
+	}
+	return id
 }

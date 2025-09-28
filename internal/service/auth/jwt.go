@@ -42,6 +42,24 @@ func (m *JWTService) CreateAccessToken(userID int64) (string, error) {
 	return signed, nil
 }
 
+func generateRefreshTokenWithHash() (string, []byte, error) {
+	b := make([]byte, 32)
+
+	if _, err := rand.Read(b); err != nil {
+		return "", nil, err
+	}
+
+	token := base64.RawURLEncoding.EncodeToString(b)
+	sum := sha256.Sum256([]byte(token))
+
+	return token, sum[:], nil
+}
+
+func generateRefreshTokenHash(refreshToken string) []byte {
+	refreshTokenHash := sha256.Sum256([]byte(refreshToken))
+	return refreshTokenHash[:]
+}
+
 func (m *JWTService) CreateRefreshToken(ctx context.Context, userID int64) (string, error) {
 	now := time.Now().UTC()
 
@@ -102,22 +120,4 @@ func (m *JWTService) ParseAccessToken(token string) (int64, error) {
 		return 0, model.ErrBadRequest
 	}
 	return int64(userID), nil
-}
-
-func generateRefreshTokenWithHash() (string, []byte, error) {
-	b := make([]byte, 32)
-
-	if _, err := rand.Read(b); err != nil {
-		return "", nil, err
-	}
-
-	token := base64.RawURLEncoding.EncodeToString(b)
-	sum := sha256.Sum256([]byte(token))
-
-	return token, sum[:], nil
-}
-
-func generateRefreshTokenHash(refreshToken string) []byte {
-	refreshTokenHash := sha256.Sum256([]byte(refreshToken))
-	return refreshTokenHash[:]
 }

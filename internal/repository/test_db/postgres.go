@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	fs          embed.FS
+	fs          embed.FS //nolint:unused // used
 	testDB      *bun.DB
 	testDSN     string
 	truncateSQL = `
@@ -93,7 +93,7 @@ func RecreateTables() {
 		log.Fatalf("migrate.NewWithSourceInstance: %v", err)
 		return
 	}
-	defer m.Close()
+	defer m.Close() //nolint:errcheck // not need
 
 	err = m.Force(1)
 	if err != nil {

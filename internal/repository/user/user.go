@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Rasulikus/notebook/internal/model"
+	"github.com/Rasulikus/notebook/internal/repository"
 	"github.com/uptrace/bun"
 )
 
@@ -23,8 +24,12 @@ func (r *repo) Create(ctx context.Context, user *model.User) error {
 
 func (r *repo) GetByEmail(ctx context.Context, email string) (*model.User, error) {
 	user := new(model.User)
-	err := r.db.NewSelect().Model(user).Where("email = ?", email).Scan(ctx)
+	err := r.db.NewSelect().
+		Model(user).
+		Where("email = ?", email).
+		Scan(ctx)
 	if err != nil {
+		err = repository.IsNoRowsError(err)
 		return nil, err
 	}
 	return user, nil

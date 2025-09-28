@@ -9,16 +9,18 @@ import (
 	"github.com/Rasulikus/notebook/internal/repository"
 	noteRepository "github.com/Rasulikus/notebook/internal/repository/note"
 	"github.com/Rasulikus/notebook/internal/repository/session"
+	tagRepository "github.com/Rasulikus/notebook/internal/repository/tag"
 	"github.com/Rasulikus/notebook/internal/repository/user"
 	"github.com/Rasulikus/notebook/internal/service/auth"
 	"github.com/Rasulikus/notebook/internal/service/note"
+	"github.com/Rasulikus/notebook/internal/service/tag"
 
 	"github.com/gin-gonic/gin"
 )
 
 const (
 	accessTTL  = 15 * time.Minute
-	refreshTTL = 6 * time.Hour
+	refreshTTL = 24 * time.Hour
 )
 
 func App() *gin.Engine {
@@ -33,11 +35,15 @@ func App() *gin.Engine {
 	sessinoRepo := session.NewRepository(db.DB)
 	jwtService := auth.NewTokenManager([]byte(cfg.Auth.Secret), accessTTL, refreshTTL, sessinoRepo)
 	authService := auth.NewService(userRepo, jwtService)
-	authHandler := handler.NewAuthHanlder(authService, jwtService, refreshTTL, false)
+	authHandler := handler.NewAuthHandler(authService, jwtService, refreshTTL, false)
+
+	tagRepo := tagRepository.NewRepository(db.DB)
+	tagService := tag.NewService(tagRepo)
+	tagHandler := handler.NewTagHandler(tagService)
 
 	noteRepo := noteRepository.NewRepository(db.DB)
-	noteService := note.NewService(noteRepo)
-	noteHanlder := handler.NewNoteHandler(noteService)
+	noteService := note.NewService(noteRepo, tagRepo)
+	noteHandler := handler.NewNoteHandler(noteService)
 
 	router := gin.Default()
 	authApi := router.Group("/auth")
@@ -50,10 +56,20 @@ func App() *gin.Engine {
 
 	noteApi := router.Group("/notes", middleware.AuthMiddleware(jwtService))
 	{
-		noteApi.POST("", noteHanlder.Create)
-		noteApi.GET("", noteHanlder.List)
-		noteApi.GET("/:id", noteHanlder.GetByID)
-		noteApi.DELETE("/:id", noteHanlder.DeleteByID)
+		noteApi.POST("", noteHandler.Create)
+		noteApi.GET("", noteHandler.List)
+		noteApi.GET("/:id", noteHandler.GetByID)
+		noteApi.PATCH("/:id", noteHandler.UpdateByID)
+		noteApi.DELETE("/:id", noteHandler.DeleteByID)
+	}
+
+	tagApi := router.Group("/tags", middleware.AuthMiddleware(jwtService))
+	{
+		tagApi.POST("", tagHandler.Create)
+		tagApi.GET("", tagHandler.List)
+		tagApi.GET("/:id", tagHandler.GetByID)
+		tagApi.PATCH("/:id", tagHandler.UpdateByID)
+		tagApi.DELETE("/:id", tagHandler.DeleteByID)
 	}
 
 	return router

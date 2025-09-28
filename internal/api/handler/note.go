@@ -11,9 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type CreateNoteReq struct {
-	Title string `json:"title" binding:"required,min=3,max=100"`
-	Text  string `json:"text"`
+type NoteHandler struct {
+	s service.NoteService
+}
+
+func NewNoteHandler(s service.NoteService) *NoteHandler {
+	return &NoteHandler{s: s}
 }
 
 type NoteResp struct {
@@ -22,27 +25,22 @@ type NoteResp struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Title     string    `json:"title"`
 	Text      string    `json:"text"`
+	Tags      []string  `json:"tags"`
 	UserID    int64     `json:"user_id"`
 }
 
-type ListQuery struct {
-	Limit  int    `form:"limit"`
-	Offset int    `form:"offset"`
-	Order  string `form:"order"`
-}
-
-type UpdateByIDNoteReq struct {
-	Title string `json:"title" binding:"required,min=3,max=100"`
-	Text  string `json:"text"`
-}
-
 func toNoteResp(n *model.Note) NoteResp {
+	tags := make([]string, 0, len(n.Tags))
+	for _, tag := range n.Tags {
+		tags = append(tags, tag.Name)
+	}
 	return NoteResp{
 		ID:        n.ID,
 		CreatedAt: n.CreatedAt,
 		UpdatedAt: n.UpdatedAt,
 		Title:     n.Title,
 		Text:      n.Text,
+		Tags:      tags,
 		UserID:    n.UserID,
 	}
 }
@@ -56,21 +54,14 @@ func toNotesResp(ns []model.Note) []NoteResp {
 	return out
 }
 
-type NoteHandler struct {
-	s service.NoteService
-}
-
-func NewNoteHandler(s service.NoteService) *NoteHandler {
-	return &NoteHandler{s: s}
+type CreateNoteReq struct {
+	Title string  `json:"title" binding:"required,min=3,max=100"`
+	Text  string  `json:"text"`
+	Tags  []int64 `json:"tags"`
 }
 
 func (h *NoteHandler) Create(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		status, pub := model.ToHTTP(model.ErrUnauthorized)
-		c.AbortWithStatusJSON(status, pub)
-		return
-	}
+	userID := middleware.CurrentUserID(c)
 
 	var req CreateNoteReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -86,22 +77,25 @@ func (h *NoteHandler) Create(c *gin.Context) {
 
 	ctx := c.Request.Context()
 	n := model.Note{Title: req.Title, Text: req.Text, UserID: userID}
-	if err := h.s.Create(ctx, &n); err != nil {
+	newNote, err := h.s.Create(ctx, &n, req.Tags)
+	if err != nil {
 		status, pub := model.ToHTTP(model.ErrBadRequest)
-		c.AbortWithStatusJSON(status, pub)
-	}
-	c.JSON(http.StatusCreated, toNoteResp(&n))
-}
-
-func (h *NoteHandler) List(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		status, pub := model.ToHTTP(model.ErrUnauthorized)
 		c.AbortWithStatusJSON(status, pub)
 		return
 	}
+	c.JSON(http.StatusCreated, toNoteResp(newNote))
+}
 
-	var q ListQuery
+type NoteListQuery struct {
+	Limit  int    `form:"limit"`
+	Offset int    `form:"offset"`
+	Order  string `form:"order"`
+}
+
+func (h *NoteHandler) List(c *gin.Context) {
+	userID := middleware.CurrentUserID(c)
+
+	var q NoteListQuery
 
 	if err := c.ShouldBindQuery(&q); err != nil {
 		status, pub := model.ToHTTP(model.ErrBadRequest)
@@ -121,12 +115,7 @@ func (h *NoteHandler) List(c *gin.Context) {
 }
 
 func (h *NoteHandler) GetByID(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		status, pub := model.ToHTTP(model.ErrUnauthorized)
-		c.AbortWithStatusJSON(status, pub)
-		return
-	}
+	userID := middleware.CurrentUserID(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -140,18 +129,20 @@ func (h *NoteHandler) GetByID(c *gin.Context) {
 	if err != nil {
 		status, pub := model.ToHTTP(model.ErrBadRequest)
 		c.AbortWithStatusJSON(status, pub)
+		return
 	}
 	c.JSON(http.StatusOK, toNoteResp(note))
 }
 
+type UpdateByIDNoteReq struct {
+	Title   *string  `json:"title" binding:"omitempty,min=1,max=100"`
+	Text    *string  `json:"text"  binding:"omitempty,max=20000"`
+	TagsIDs *[]int64 `json:"tags"`
+}
+
 // PATCH /notes/{id}
 func (h *NoteHandler) UpdateByID(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		status, pub := model.ToHTTP(model.ErrUnauthorized)
-		c.AbortWithStatusJSON(status, pub)
-		return
-	}
+	userID := middleware.CurrentUserID(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -159,6 +150,7 @@ func (h *NoteHandler) UpdateByID(c *gin.Context) {
 		c.AbortWithStatusJSON(status, pub)
 		return
 	}
+
 	var req UpdateByIDNoteReq
 	err = c.ShouldBindJSON(&req)
 	if err != nil {
@@ -167,28 +159,29 @@ func (h *NoteHandler) UpdateByID(c *gin.Context) {
 			c.AbortWithStatusJSON(status, pub)
 			return
 		}
-		status, pub := model.ToHTTP(model.ErrBadRequest)
+		status, pub := model.ToHTTP(err)
 		c.AbortWithStatusJSON(status, pub)
 		return
 	}
+
 	ctx := c.Request.Context()
-	n := model.Note{
-		Title:  req.Title,
-		Text:   req.Text,
-		ID:     id,
-		UserID: userID,
+	r := &service.UpdateByIDNoteReq{
+		Title:   req.Title,
+		Text:    req.Text,
+		TagsIDs: req.TagsIDs,
 	}
-	h.s.UpdateByID(ctx, userID, &n)
-	c.JSON(http.StatusOK, toNoteResp(&n))
+	note, err := h.s.UpdateByID(ctx, userID, id, r)
+	if err != nil {
+		status, pub := model.ToHTTP(err)
+		c.AbortWithStatusJSON(status, pub)
+		return
+	}
+
+	c.JSON(http.StatusOK, toNoteResp(note))
 }
 
 func (h *NoteHandler) DeleteByID(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		status, pub := model.ToHTTP(model.ErrUnauthorized)
-		c.AbortWithStatusJSON(status, pub)
-		return
-	}
+	userID := middleware.CurrentUserID(c)
 
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -202,6 +195,8 @@ func (h *NoteHandler) DeleteByID(c *gin.Context) {
 	if err != nil {
 		status, pub := model.ToHTTP(model.ErrBadRequest)
 		c.AbortWithStatusJSON(status, pub)
+		return
 	}
+
 	c.JSON(http.StatusOK, "note is delete")
 }

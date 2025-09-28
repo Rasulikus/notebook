@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 
@@ -22,12 +21,13 @@ func NewService(userRepo repository.UserRepository, jwtService *JWTService) *ser
 
 func (s *service) Register(ctx context.Context, email, password, name string) error {
 	lowEmail := strings.ToLower(strings.TrimSpace(email))
-	existedUser, err := s.userRepo.GetByEmail(ctx, lowEmail)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-	if existedUser != nil {
+	_, err := s.userRepo.GetByEmail(ctx, lowEmail)
+	if err == nil {
 		return model.ErrConflict
+
+	}
+	if !errors.Is(err, model.ErrNotFound) {
+		return err
 	}
 
 	cost := bcrypt.DefaultCost
@@ -49,7 +49,7 @@ func (s *service) Register(ctx context.Context, email, password, name string) er
 }
 
 // должен вернуть access, refresh, userID и ошибку
-func (s *service) Login(ctx context.Context, email, password string) (string, string, int64, error) {
+func (s *service) Login(ctx context.Context, email, password string) (accessToken, refreshToken string, userID int64, err error) {
 	lowEmail := strings.ToLower(strings.TrimSpace(email))
 	user, err := s.userRepo.GetByEmail(ctx, lowEmail)
 	if err != nil {
@@ -63,15 +63,15 @@ func (s *service) Login(ctx context.Context, email, password string) (string, st
 		return "", "", 0, model.ErrBadRequest
 	}
 
-	access, err := s.jwtService.CreateAccessToken(user.ID)
+	accessToken, err = s.jwtService.CreateAccessToken(user.ID)
 	if err != nil {
 		return "", "", 0, model.ErrBadRequest
 	}
-	refresh, err := s.jwtService.CreateRefreshToken(ctx, user.ID)
+	refreshToken, err = s.jwtService.CreateRefreshToken(ctx, user.ID)
 	if err != nil {
 		return "", "", 0, model.ErrBadRequest
 	}
-	return access, refresh, user.ID, nil
+	return accessToken, refreshToken, user.ID, nil
 }
 
 func (m *JWTService) Logout(ctx context.Context, refreshToken string) error {

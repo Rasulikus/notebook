@@ -40,7 +40,7 @@ type AuthHandler struct {
 	secureCookie bool
 }
 
-func NewAuthHanlder(authService service.AuthService, jwtService service.JWTService, refreshTTL time.Duration, secureCookie bool) *AuthHandler {
+func NewAuthHandler(authService service.AuthService, jwtService service.JWTService, refreshTTL time.Duration, secureCookie bool) *AuthHandler {
 	return &AuthHandler{authService: authService, jwtService: jwtService, refreshTTL: refreshTTL, secureCookie: secureCookie}
 }
 
@@ -89,7 +89,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	ctx := c.Request.Context()
 	access, newRefresh, err := h.jwtService.RotateRefreshToken(ctx, refresh)
 	if err != nil {
-		//clearRefreshCookie(c, h.secureCookie)
+		clearRefreshCookie(c, h.secureCookie)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
