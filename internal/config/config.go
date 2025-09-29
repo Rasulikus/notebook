@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -9,11 +8,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var (
-	ErrSecretMissing = errors.New("SECRET is missing or empty")
-)
-
 const (
+	keyHTTPHost, defaultHTTPHost = "HTTP_HOST", "localhost"
+	keyHTTPPort, defaultHTTPPort = "HTTP_PORT", "8081"
+
 	keyDBHost, defaultDBHost = "DB_HOST", "localhost"
 	keyDBPort, defaultDBPort = "DB_PORT", "5432"
 	keyDBUser, defaultDBUser = "DB_USER", "root"
@@ -26,6 +24,7 @@ const (
 )
 
 type Config struct {
+	HTTP HTTPConfig
 	Db   DbConfig
 	Auth AuthConfig
 }
@@ -40,6 +39,11 @@ type DbConfig struct {
 
 func (cfg *DbConfig) PostgresURL() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", cfg.User, cfg.Pass, cfg.Host, cfg.Port, cfg.Name)
+}
+
+type HTTPConfig struct {
+	Host string
+	Port string
 }
 
 type AuthConfig struct {
@@ -61,6 +65,9 @@ func LoadConfig() *Config {
 	}
 
 	cfg := new(Config)
+
+	cfg.HTTP.Host = getEnv(keyHTTPHost, defaultHTTPHost)
+	cfg.HTTP.Port = getEnv(keyHTTPPort, defaultHTTPPort)
 
 	cfg.Db.Host = getEnv(keyDBHost, defaultDBHost)
 	cfg.Db.Port = getEnv(keyDBPort, defaultDBPort)

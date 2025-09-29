@@ -17,5 +17,4 @@ type Note struct {
 	Tags []*Tag `bun:"m2m:notes_tags,join:Note=Tag"`
 
 	UserID int64 `json:"user_id" bun:"user_id,notnull"`
-	User   *User `json:"user" bun:"rel:belongs-to,join:user_id=id"`
 }

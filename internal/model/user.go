@@ -15,6 +15,4 @@ type User struct {
 	Email         string    `json:"email" bun:"email,unique,notnull"`
 	PasswordHash  string    `json:"-" bun:"password_hash,notnull"`
 	Name          string    `json:"name" bun:"name,notnull"`
-	Notes         []*Note   `json:"notes" bun:"rel:has-many,join:id=user_id"`
-	Tags          []*Tag    `json:"tags" bun:"rel:has-many,join:id=user_id"`
 }

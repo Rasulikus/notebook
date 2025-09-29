@@ -11,19 +11,20 @@ import (
 )
 
 var (
-	ErrNotFound     = errors.New("not found")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrForbidden    = errors.New("forbidden")
-	ErrConflict     = errors.New("conflict")
-	ErrBadRequest   = errors.New("bad request")
+	ErrNotFound         = errors.New("not found")
+	ErrUnauthorized     = errors.New("unauthorized")
+	ErrForbidden        = errors.New("forbidden")
+	ErrConflict         = errors.New("conflict")
+	ErrBadRequest       = errors.New("bad request")
+	ErrWrongCredentials = errors.New("wrong credentials")
 )
 
 var tagMsg = map[string]string{
-	"required": "обязательное поле",
-	"min":      "минимум %s символ(а/ов)",
-	"max":      "максимум %s символ(а/ов)",
-	"len":      "ровно %s символ(а/ов)",
-	"email":    "некорректный email",
+	"required": "required field",
+	"min":      "minimum %s character(s)",
+	"max":      "maximum %s character(s)",
+	"len":      "exactly %s character(s)",
+	"email":    "invalid email",
 }
 
 type ValidationError struct {
@@ -42,23 +43,25 @@ func ToHTTP(err error) (int, PublicError) {
 	var v *ValidationError
 	if errors.As(err, &v) {
 		return http.StatusUnprocessableEntity, PublicError{
-			Code: "validation_failed", Message: "Проверьте корректность полей", Details: v.Fields,
+			Code: "validation_failed", Message: "Please check field values", Details: v.Fields,
 		}
 	}
 	switch {
 	case errors.Is(err, ErrUnauthorized):
-		return http.StatusUnauthorized, PublicError{Code: "unauthorized", Message: "Требуется авторизация"}
+		return http.StatusUnauthorized, PublicError{Code: "unauthorized", Message: "Authorization required"}
 	case errors.Is(err, ErrForbidden):
-		return http.StatusForbidden, PublicError{Code: "forbidden", Message: "Доступ запрещён"}
+		return http.StatusForbidden, PublicError{Code: "forbidden", Message: "Access denied"}
 	case errors.Is(err, ErrNotFound):
-		return http.StatusNotFound, PublicError{Code: "not_found", Message: "Ресурс не найден"}
+		return http.StatusNotFound, PublicError{Code: "not_found", Message: "Resource not found"}
 	case errors.Is(err, ErrConflict):
-		return http.StatusConflict, PublicError{Code: "conflict", Message: "Конфликт состояния"}
+		return http.StatusConflict, PublicError{Code: "conflict", Message: "State conflict"}
 	case errors.Is(err, ErrBadRequest):
-		return http.StatusBadRequest, PublicError{Code: "bad_request", Message: "Некорректный запрос"}
+		return http.StatusBadRequest, PublicError{Code: "bad_request", Message: "Bad request"}
+	case errors.Is(err, ErrWrongCredentials):
+		return http.StatusUnauthorized, PublicError{Code: "wrong_credentials", Message: "Invalid email or password"}
 	default:
 		return http.StatusInternalServerError, PublicError{
-			Code: "internal_error", Message: "Произошла внутренняя ошибка",
+			Code: "internal_error", Message: "Internal server error",
 		}
 	}
 }

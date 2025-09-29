@@ -23,7 +23,7 @@ type UserRepository interface {
 
 type SessionRepository interface {
 	Create(ctx context.Context, session *model.Session) error
-	RotateRefreshTokenTx(ctx context.Context, oldhash, newHash []byte, newExpiresAt time.Time) (*model.Session, error)
+	RotateRefreshToken(ctx context.Context, oldhash, newHash []byte, newExpiresAt time.Time) (*model.Session, error)
 	SetRevokedAtNow(ctx context.Context, refreshTokenHash []byte) error
 }
 

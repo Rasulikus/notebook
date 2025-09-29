@@ -22,8 +22,10 @@ type NoteService interface {
 
 type AuthService interface {
 	Register(ctx context.Context, email, password, name string) error
-	// должен вернуть access, refresh, userID и ошибку
 	Login(ctx context.Context, email, password string) (accessToken, refreshToken string, userID int64, err error)
+	Refresh(ctx context.Context, oldRefreshToken string) (string, string, error)
+	ParseAccessToken(token string) (int64, error)
+	Logout(ctx context.Context, refreshToken string) error
 }
 
 type JWTService interface {
@@ -31,7 +33,6 @@ type JWTService interface {
 	CreateRefreshToken(ctx context.Context, userID int64) (string, error)
 	RotateRefreshToken(ctx context.Context, oldRefresh string) (string, string, error)
 	ParseAccessToken(token string) (int64, error)
-	Logout(ctx context.Context, refreshToken string) error
 }
 
 type TagService interface {

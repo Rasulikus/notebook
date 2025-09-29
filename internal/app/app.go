@@ -33,9 +33,13 @@ func App() *gin.Engine {
 
 	userRepo := user.NewRepository(db.DB)
 	sessinoRepo := session.NewRepository(db.DB)
-	jwtService := auth.NewTokenManager([]byte(cfg.Auth.Secret), accessTTL, refreshTTL, sessinoRepo)
-	authService := auth.NewService(userRepo, jwtService)
-	authHandler := handler.NewAuthHandler(authService, jwtService, refreshTTL, false)
+	authService := auth.NewService(userRepo, auth.TokenConfig{
+		Secret:      []byte(cfg.Auth.Secret),
+		AccessTTL:   accessTTL,
+		RefreshTTL:  refreshTTL,
+		SessionRepo: sessinoRepo,
+	})
+	authHandler := handler.NewAuthHandler(authService, refreshTTL, false)
 
 	tagRepo := tagRepository.NewRepository(db.DB)
 	tagService := tag.NewService(tagRepo)
@@ -54,7 +58,7 @@ func App() *gin.Engine {
 		authApi.POST("/logout", authHandler.Logout)
 	}
 
-	noteApi := router.Group("/notes", middleware.AuthMiddleware(jwtService))
+	noteApi := router.Group("/notes", middleware.AuthMiddleware(authService))
 	{
 		noteApi.POST("", noteHandler.Create)
 		noteApi.GET("", noteHandler.List)
@@ -63,7 +67,7 @@ func App() *gin.Engine {
 		noteApi.DELETE("/:id", noteHandler.DeleteByID)
 	}
 
-	tagApi := router.Group("/tags", middleware.AuthMiddleware(jwtService))
+	tagApi := router.Group("/tags", middleware.AuthMiddleware(authService))
 	{
 		tagApi.POST("", tagHandler.Create)
 		tagApi.GET("", tagHandler.List)

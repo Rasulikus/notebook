@@ -105,7 +105,7 @@ func Test_Repo_Create(t *testing.T) {
 	}
 }
 
-func Test_Repo_RotateRefreshTokenTX(t *testing.T) {
+func Test_Repo_RotateRefreshToken(t *testing.T) {
 	ts := setupTestSuite(t)
 	testdb.CleanDB(ts.ctx)
 	now := time.Now().UTC()
@@ -119,7 +119,7 @@ func Test_Repo_RotateRefreshTokenTX(t *testing.T) {
 
 	err := ts.sessionRepo.Create(ts.ctx, session)
 	require.NoError(t, err)
-	newSession, err := ts.sessionRepo.RotateRefreshTokenTx(ts.ctx, session.RefreshTokenHash, newRefreshTokenHash, now.Add(4*time.Hour))
+	newSession, err := ts.sessionRepo.RotateRefreshToken(ts.ctx, session.RefreshTokenHash, newRefreshTokenHash, now.Add(4*time.Hour))
 	require.NoError(t, err)
 	require.Equal(t, newSession.ID, session.ID)
 	require.Equal(t, newSession.RefreshTokenHash, newRefreshTokenHash)

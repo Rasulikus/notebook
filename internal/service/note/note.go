@@ -1,3 +1,4 @@
+// Package note provides business logic for notes.
 package note
 
 import (
@@ -10,16 +11,19 @@ import (
 	"github.com/Rasulikus/notebook/internal/service"
 )
 
-type s struct {
+// Package note provides business logic for notes.
+type Service struct {
 	noteRepo repository.NoteRepository
 	tagRepo  repository.TagRepository
 }
 
-func NewService(noteRepo repository.NoteRepository, tagRepo repository.TagRepository) *s {
-	return &s{noteRepo: noteRepo, tagRepo: tagRepo}
+// Package note provides business logic for notes.
+func NewService(noteRepo repository.NoteRepository, tagRepo repository.TagRepository) *Service {
+	return &Service{noteRepo: noteRepo, tagRepo: tagRepo}
 }
 
-func (s *s) Create(ctx context.Context, n *model.Note, tagsIDs []int64) (*model.Note, error) {
+// Create builds a note and attaches tags by IDs.
+func (s *Service) Create(ctx context.Context, n *model.Note, tagsIDs []int64) (*model.Note, error) {
 	for _, tagID := range tagsIDs {
 		tag, err := s.tagRepo.GetByID(ctx, n.UserID, tagID)
 		if err != nil {
@@ -31,7 +35,8 @@ func (s *s) Create(ctx context.Context, n *model.Note, tagsIDs []int64) (*model.
 	return s.noteRepo.Create(ctx, n, n.Tags)
 }
 
-func (s *s) List(ctx context.Context, userID int64, limit, offset int, order string) ([]model.Note, error) {
+// List returns user notes with sane defaults.
+func (s *Service) List(ctx context.Context, userID int64, limit, offset int, order string) ([]model.Note, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
@@ -44,11 +49,13 @@ func (s *s) List(ctx context.Context, userID int64, limit, offset int, order str
 	return s.noteRepo.List(ctx, userID, limit, offset, order)
 }
 
-func (s *s) GetByID(ctx context.Context, userID, id int64) (*model.Note, error) {
+// GetByID returns a single note owned by the user.
+func (s *Service) GetByID(ctx context.Context, userID, id int64) (*model.Note, error) {
 	return s.noteRepo.GetByID(ctx, userID, id)
 }
 
-func (s *s) UpdateByID(ctx context.Context, userID, id int64, req *service.UpdateByIDNoteReq) (*model.Note, error) {
+// UpdateByID applies partial changes and optionally replaces tags.
+func (s *Service) UpdateByID(ctx context.Context, userID, id int64, req *service.UpdateByIDNoteReq) (*model.Note, error) {
 	if req.TagsIDs != nil {
 		_, err := s.tagRepo.GetByIDs(ctx, userID, *req.TagsIDs)
 		if err != nil {
@@ -66,6 +73,7 @@ func (s *s) UpdateByID(ctx context.Context, userID, id int64, req *service.Updat
 	return note, nil
 }
 
-func (s *s) DeleteByID(ctx context.Context, userID, id int64) error {
+// DeleteByID removes a note owned by the user.
+func (s *Service) DeleteByID(ctx context.Context, userID, id int64) error {
 	return s.noteRepo.DeleteByID(ctx, userID, id)
 }

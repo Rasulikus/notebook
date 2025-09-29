@@ -45,3 +45,14 @@ func IsNoRowsError(err error) error {
 	}
 	return err
 }
+
+func IsUniqueViolation(err error) error {
+	if err == nil {
+		return nil
+	}
+	var pgErr pgdriver.Error
+	if errors.As(err, &pgErr) && pgErr.Field('C') == "23505" {
+		return model.ErrConflict
+	}
+	return err
+}

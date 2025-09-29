@@ -19,7 +19,7 @@ func NewRepository(db *bun.DB) *Repo {
 
 func (r *Repo) Create(ctx context.Context, tag *model.Tag) error {
 	_, err := r.db.NewInsert().Model(tag).Returning("*").Exec(ctx)
-	return err
+	return repository.IsUniqueViolation(err)
 }
 
 func (r *Repo) CreateTags(ctx context.Context, tags []*model.Tag) ([]*model.Tag, error) {

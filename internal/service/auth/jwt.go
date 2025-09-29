@@ -2,68 +2,69 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"time"
 
 	"github.com/Rasulikus/notebook/internal/model"
-	"github.com/Rasulikus/notebook/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type JWTService struct {
-	secret      []byte
-	accessTTL   time.Duration
-	refreshTTL  time.Duration
-	sessionRepo repository.SessionRepository
+// tokenManager issues/parses access tokens and manages refresh sessions.
+type tokenManager struct {
+	TokenConfig
 }
 
-func NewTokenManager(secret []byte, accessTTL, refreshTTL time.Duration, sessionRepo repository.SessionRepository) *JWTService {
-	return &JWTService{
-		secret:      secret,
-		accessTTL:   accessTTL,
-		refreshTTL:  refreshTTL,
-		sessionRepo: sessionRepo,
-	}
+// NewTokenManager constructor for JWTService.
+func newTokenManager(cfg TokenConfig) *tokenManager {
+	return &tokenManager{cfg}
 }
 
-func (m *JWTService) CreateAccessToken(userID int64) (string, error) {
+// CreateAccessToken builds HS256 JWT with uid and exp.
+func (m *tokenManager) CreateAccessToken(userID int64) (string, error) {
 	now := time.Now().UTC()
 	claims := jwt.MapClaims{
 		"uid": userID,
-		"exp": now.Add(m.accessTTL).Unix(),
+		"exp": now.Add(m.AccessTTL).Unix(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString(m.secret)
+	signed, err := token.SignedString(m.Secret)
 	if err != nil {
 		return "", err
 	}
 	return signed, nil
 }
 
-func generateRefreshTokenWithHash() (string, []byte, error) {
+// generateRefreshTokenWithHash creates a random refresh token (base64url)
+// and returns its HMAC-SHA256 (with service secret). Only the HMAC is stored in DB.
+func (m *tokenManager) generateRefreshTokenWithHash() (string, []byte, error) {
 	b := make([]byte, 32)
-
 	if _, err := rand.Read(b); err != nil {
 		return "", nil, err
 	}
-
 	token := base64.RawURLEncoding.EncodeToString(b)
-	sum := sha256.Sum256([]byte(token))
 
-	return token, sum[:], nil
+	mac := hmac.New(sha256.New, m.Secret)
+	mac.Write([]byte(token))
+	sum := mac.Sum(nil)
+
+	return token, sum, nil
 }
 
-func generateRefreshTokenHash(refreshToken string) []byte {
-	refreshTokenHash := sha256.Sum256([]byte(refreshToken))
-	return refreshTokenHash[:]
+// generateRefreshTokenHash computes HMAC for a provided refresh token string.
+func (m *tokenManager) generateRefreshTokenHash(refreshToken string) []byte {
+	mac := hmac.New(sha256.New, m.Secret)
+	mac.Write([]byte(refreshToken))
+	return mac.Sum(nil)
 }
 
-func (m *JWTService) CreateRefreshToken(ctx context.Context, userID int64) (string, error) {
+// CreateRefreshToken creates a refresh token and persists its HMAC with TTL.
+func (m *tokenManager) CreateRefreshToken(ctx context.Context, userID int64) (string, error) {
 	now := time.Now().UTC()
 
-	token, hash, err := generateRefreshTokenWithHash()
+	token, hash, err := m.generateRefreshTokenWithHash()
 	if err != nil {
 		return "", err
 	}
@@ -71,25 +72,26 @@ func (m *JWTService) CreateRefreshToken(ctx context.Context, userID int64) (stri
 	sess := &model.Session{
 		UserID:           userID,
 		RefreshTokenHash: hash,
-		ExpiresAt:        now.Add(m.refreshTTL),
+		ExpiresAt:        now.Add(m.RefreshTTL),
 	}
 
-	err = m.sessionRepo.Create(ctx, sess)
+	err = m.SessionRepo.Create(ctx, sess)
 	if err != nil {
 		return "", err
 	}
 	return token, nil
 }
 
-func (m *JWTService) RotateRefreshToken(ctx context.Context, oldRefresh string) (string, string, error) {
+// RotateRefreshToken atomically rotates a valid, unrevoked, unexpired refresh.
+func (m *tokenManager) RotateRefreshToken(ctx context.Context, oldRefresh string) (string, string, error) {
 	now := time.Now().UTC()
-	oldhash := generateRefreshTokenHash(oldRefresh)
+	oldhash := m.generateRefreshTokenHash(oldRefresh)
 
-	newRefresh, newHash, err := generateRefreshTokenWithHash()
+	newRefresh, newHash, err := m.generateRefreshTokenWithHash()
 	if err != nil {
 		return "", "", err
 	}
-	newSession, err := m.sessionRepo.RotateRefreshTokenTx(ctx, oldhash[:], newHash, now.Add(m.refreshTTL))
+	newSession, err := m.SessionRepo.RotateRefreshToken(ctx, oldhash[:], newHash, now.Add(m.RefreshTTL))
 	if err != nil {
 		return "", "", err
 	}
@@ -100,7 +102,9 @@ func (m *JWTService) RotateRefreshToken(ctx context.Context, oldRefresh string) 
 	return access, newRefresh, nil
 }
 
-func (m *JWTService) ParseAccessToken(token string) (int64, error) {
+// ParseAccessToken verifies HS256, validates signature/exp,
+// and extracts uid claim as int64.
+func (m *tokenManager) ParseAccessToken(token string) (int64, error) {
 	var claims jwt.MapClaims
 
 	t, err := jwt.ParseWithClaims(
@@ -110,14 +114,14 @@ func (m *JWTService) ParseAccessToken(token string) (int64, error) {
 			if t.Method != jwt.SigningMethodHS256 {
 				return nil, model.ErrBadRequest
 			}
-			return m.secret, nil
+			return m.Secret, nil
 		})
 	if err != nil || !t.Valid {
-		return 0, model.ErrBadRequest
+		return 0, model.ErrUnauthorized
 	}
 	userID, ok := claims["uid"].(float64)
 	if !ok {
-		return 0, model.ErrBadRequest
+		return 0, model.ErrUnauthorized
 	}
 	return int64(userID), nil
 }

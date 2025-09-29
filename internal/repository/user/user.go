@@ -29,8 +29,7 @@ func (r *repo) GetByEmail(ctx context.Context, email string) (*model.User, error
 		Where("email = ?", email).
 		Scan(ctx)
 	if err != nil {
-		err = repository.IsNoRowsError(err)
-		return nil, err
+		return nil, repository.IsNoRowsError(err)
 	}
 	return user, nil
 
