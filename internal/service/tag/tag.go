@@ -3,6 +3,7 @@ package tag
 
 import (
 	"context"
+	"errors"
 
 	"github.com/Rasulikus/notebook/internal/model"
 	"github.com/Rasulikus/notebook/internal/repository"
@@ -20,7 +21,14 @@ func NewService(tagRepo repository.TagRepository) *Service {
 
 // Create creates a tag for a user.
 func (s *Service) Create(ctx context.Context, tag *model.Tag) error {
-	return s.tagRepo.Create(ctx, tag)
+	err := s.tagRepo.Create(ctx, tag)
+	if err != nil {
+		if errors.Is(err, model.ErrConflict) {
+
+		}
+		return err
+	}
+	return nil
 }
 
 // List returns user's tags with defaults.

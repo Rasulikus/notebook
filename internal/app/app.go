@@ -1,8 +1,6 @@
 package app
 
 import (
-	"time"
-
 	"github.com/Rasulikus/notebook/internal/api/handler"
 	"github.com/Rasulikus/notebook/internal/api/middleware"
 	"github.com/Rasulikus/notebook/internal/config"
@@ -18,13 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	accessTTL  = 15 * time.Minute
-	refreshTTL = 24 * time.Hour
-)
-
-func App() *gin.Engine {
-	cfg := config.LoadConfig()
+func App(cfg *config.Config) *gin.Engine {
 
 	db, err := repository.NewClient(cfg)
 	if err != nil {
@@ -32,14 +24,14 @@ func App() *gin.Engine {
 	}
 
 	userRepo := user.NewRepository(db.DB)
-	sessinoRepo := session.NewRepository(db.DB)
+	sessionRepo := session.NewRepository(db.DB)
 	authService := auth.NewService(userRepo, auth.TokenConfig{
 		Secret:      []byte(cfg.Auth.Secret),
-		AccessTTL:   accessTTL,
-		RefreshTTL:  refreshTTL,
-		SessionRepo: sessinoRepo,
+		AccessTTL:   cfg.Auth.AccessTTL,
+		RefreshTTL:  cfg.Auth.RefreshTTL,
+		SessionRepo: sessionRepo,
 	})
-	authHandler := handler.NewAuthHandler(authService, refreshTTL, false)
+	authHandler := handler.NewAuthHandler(authService, cfg.Auth.RefreshTTL, false)
 
 	tagRepo := tagRepository.NewRepository(db.DB)
 	tagService := tag.NewService(tagRepo)

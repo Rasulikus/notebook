@@ -13,7 +13,7 @@ func main() {
 	cfg := config.LoadConfig()
 	server := http.Server{
 		Addr:    fmt.Sprintf("%s:%s", cfg.HTTP.Host, cfg.HTTP.Port),
-		Handler: app.App(),
+		Handler: app.App(cfg),
 	}
 
 	log.Printf("Server start at addres: " + server.Addr)

@@ -30,15 +30,6 @@ func NewService(userRepo repository.UserRepository, cfg TokenConfig) *Service {
 // Register creates a new user.
 func (s *Service) Register(ctx context.Context, email, password, name string) error {
 	lowEmail := strings.ToLower(strings.TrimSpace(email))
-	_, err := s.userRepo.GetByEmail(ctx, lowEmail)
-	if err == nil {
-		return model.ErrConflict
-
-	}
-	if !errors.Is(err, model.ErrNotFound) {
-		return err
-	}
-
 	cost := bcrypt.DefaultCost
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), cost)
 	if err != nil {

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -18,7 +20,9 @@ const (
 	keyDBPass, defaultDBPass = "DB_PASS", "example"
 	keyDBName, defaultDBName = "DB_NAME", "notebook"
 
-	keyAuthSecret, defaultAuthSecret = "AUTH_SECRET", "1420061f070b81aac84ceb449812770ab9d1f1d6b4c0aba33533ce6dde6f96fb"
+	keyAuthAccessTTL, defaultAuthAccessTTL   = "AUTH_ACCESS_TTL", "15m"
+	keyAuthRefreshTTL, defaultAuthRefreshTTL = "AUTH_REFRESH_TTL", "720h" // 30d
+	keyAuthSecret, defaultAuthSecret         = "AUTH_SECRET", "1420061f070b81aac84ceb449812770ab9d1f1d6b4c0aba33533ce6dde6f96fb"
 
 	LogDefaultValue = "%s is missing, using default value"
 )
@@ -47,7 +51,9 @@ type HTTPConfig struct {
 }
 
 type AuthConfig struct {
-	Secret string
+	AccessTTL  time.Duration
+	RefreshTTL time.Duration
+	Secret     string
 }
 
 func getEnv(key, defaultValue string) string {
@@ -57,6 +63,24 @@ func getEnv(key, defaultValue string) string {
 		return defaultValue
 	}
 	return value
+}
+func getEnvDuration(key, defaultValue string) time.Duration {
+	raw := getEnv(key, defaultValue)
+
+	if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+		return d
+	}
+
+	if secs, err := strconv.ParseInt(raw, 10, 64); err == nil && secs > 0 {
+		return time.Duration(secs) * time.Second
+	}
+
+	log.Printf("invalid duration for %s=%q, using default %s", key, raw, defaultValue)
+	d, err := time.ParseDuration(defaultValue)
+	if err != nil {
+		log.Fatal("Cant parse duration")
+	}
+	return d
 }
 
 func LoadConfig() *Config {
@@ -75,6 +99,8 @@ func LoadConfig() *Config {
 	cfg.Db.Pass = getEnv(keyDBPass, defaultDBPass)
 	cfg.Db.Name = getEnv(keyDBName, defaultDBName)
 
+	cfg.Auth.AccessTTL = getEnvDuration(keyAuthAccessTTL, defaultAuthAccessTTL)
+	cfg.Auth.RefreshTTL = getEnvDuration(keyAuthRefreshTTL, defaultAuthRefreshTTL)
 	cfg.Auth.Secret = getEnv(keyAuthSecret, defaultAuthSecret)
 
 	return cfg

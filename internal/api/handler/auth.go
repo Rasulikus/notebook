@@ -53,7 +53,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		c.AbortWithStatusJSON(status, pub)
 		return
 	}
-	c.Status(http.StatusNoContent)
+	c.Status(http.StatusCreated)
 }
 
 // LoginReq login request.
@@ -64,8 +64,8 @@ type LoginReq struct {
 
 // LoginResp login response.
 type LoginResp struct {
-	Access string `json:"access"`
-	UserID int64  `json:"user_id"`
+	AccessToken string `json:"access_token"`
+	UserID      int64  `json:"user_id"`
 }
 
 // Login (POST /auth/login) returns access token and user_id in JSON.
@@ -91,12 +91,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	setRefreshCookie(c, refresh, h.refreshTTL, h.secureCookie)
-	c.JSON(http.StatusOK, LoginResp{Access: access, UserID: userID})
+	c.JSON(http.StatusOK, LoginResp{AccessToken: access, UserID: userID})
 }
 
 // RefreshResp response with new access token.
 type RefreshResp struct {
-	Access string `json:"access"`
+	AccessToken string `json:"access_token"`
 }
 
 // Refresh (POST /auth/refresh) reads refresh cookie, rotates refresh,
@@ -118,7 +118,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	}
 
 	setRefreshCookie(c, newRefresh, h.refreshTTL, h.secureCookie)
-	c.JSON(http.StatusOK, RefreshResp{Access: access})
+	c.JSON(http.StatusOK, RefreshResp{AccessToken: access})
 }
 
 // Logout (POST /auth/logout) revokes the session and clears the refresh cookie.

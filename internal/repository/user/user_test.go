@@ -45,7 +45,7 @@ func Test_Repo_Create(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, user.ID)
 	err = ts.userRepo.Create(ts.ctx, user)
-	require.Error(t, err, "the user with this email already exists")
+	require.ErrorIs(t, err, model.ErrConflict, "the user with this email already exists")
 }
 
 func Test_Repo_FindByEmail(t *testing.T) {
